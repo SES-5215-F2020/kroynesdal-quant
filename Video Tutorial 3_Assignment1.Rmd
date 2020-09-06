@@ -1,0 +1,20 @@
+---
+title: "Assignment 1"
+author: "Kari Roynesdal"
+date: "9/5/2020"
+output: html_document
+---
+# Level 1 title
+
+Text text text
+
+## Level 2 title 
+
+More text 
+
+```{r}
+2 + 2 
+```
+
+Answer yay! 
+
