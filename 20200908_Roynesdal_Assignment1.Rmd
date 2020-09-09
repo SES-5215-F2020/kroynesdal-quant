@@ -1,0 +1,73 @@
+---
+title: "Assignment 1"
+author: "Kari Roynesdal"
+date: "9/8/2020"
+output: html_document
+---
+remotes::install_github("walkerke/tidycensus")
+
+```{r results = "hide", message = FALSE, warning = FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning=FALSE)
+
+```
+
+
+```{r load libraries, message=FALSE}
+library(tidycensus)
+library(tidyverse)
+```
+
+
+# Variables Used
+
+I wanted to explore the relationship between various population variables such as race, citizenship, and age, with property ownership, property value, household income, and whether an individual owned or rented a property. My unit of analysis is person level. I chose variables from ACS- 1 year census from 2018, and wanted to see this data for the population in Massachusetts at the state level.     
+
+1. Race (categorical variable)
+2. Specified owner unit (categorical variable)
+3. Citizenship status (categorical variable)
+4. Age (continuous) 
+5. Household Income (continuous)
+6. Property Value (continuous)     
+
+
+```{r property ownership MA data}
+
+propertyownershipMA_data <- get_pums (variables = c("RAC1P",
+                                      "SVAL", 
+                                      "FCITP", 
+                                      "AGEP",
+                                      "HINCP", 
+                                      "VALP"),
+                        state = "MA", 
+                        year = 2018, 
+                        survey = "acs1",
+                        recode = TRUE) %>%
+  filter(VALP > 0) %>%
+  select(RAC1P, SVAL_label, FCITP_label, AGEP, HINCP, VALP)
+
+
+```
+
+Display rows of data frame:
+
+```{r display property ownership data}
+
+propertyownershipMA_data
+
+```
+
+My final data set has 46,398 rows, showing an analysis for the entire state of Massachusetts. 
+
+Saved CSV File: 
+
+```{r write csv file}
+write_csv(propertyownershipMA_data, "propertyownershipMA_data.csv")
+```
+
+
+
+
+
+
+
+
