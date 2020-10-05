@@ -1,0 +1,48 @@
+---
+title: "Assignment 4"
+author: "Kari Roynesdal"
+date: "10/05/2020"
+output: html_document
+---
+remotes::install_github("walkerke/tidycensus")
+```{r load libraries, message=FALSE, results='hide'}
+library(tidycensus)
+library(tidyverse)
+```
+
+```{r, message=FALSE, results='hide'}
+Suffolk_tract_data <- read_csv("Suffolk_census_tracts2.csv")
+
+```
+
+## Linear Regression Model
+
+**Dependent Variable**: 
+
+Percent Owner-Occupied Households 
+
+**Independent Variables**:
+
+
+The majority racial/ethnic identity
+
+The population of the tract
+
+The median age of residents
+
+The total household size (family, excluding roommates) 
+
+
+```{r}
+model <- lm(pct_own ~ med_age + tot_pop + majority_race_eth + tot_hh_fam, 
+            data = Suffolk_tract_data)
+summary(model)
+```
+
+### Linear Regression Interpretation
+
+My results show me that with an adjusted R-squared value of 0.6725, these variables explain 67% of the variation in owner-occupied household percentage.For my independent variables, according to this Linear Regression model, there is a statistically significant relationship at a 95% confidence interval between my dependent variable, percent owner-occupied households, and median age, total household size, and majority asian, hispanic, and black race/ethnicity at the neighborhood level. My variable that has been left out of the regression is majority white race/ethnicity, which I wanted to compare all of my independent variables to.
+
+Median Age has an direct relationship with the dependent variable. As median age increases, the proportion of all the households that are owner-occupied increases. For every one year age increase to a household at the neighborhood level, the owner-occupied household percentage increases by 0.01677. Hispanic, asian, and black households at the neighborhood level have an inverse relationship with the dependent variable, so as majority hispanic, asian, and black households at the neighborhood level increase, the proportion of all households that are owner-occupied decreases.
+
+Total household size for census classified "family" households (not including roommates) also has a direct relationship with the dependent variable. As the household size increases, the proportion of all the households that are owner-occupied increases. For every one person increase to a household at the neighborhood level, the owner-occupied household percentage increases by 0.0001494.
