@@ -1,0 +1,298 @@
+---
+title: "Assignment 3"
+author: "Kari Roynesdal"
+date: "9/22/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+```{r load libraries, message=FALSE, results='hide'}
+library(tidycensus)
+library(tidyverse)
+library(ggplot2)
+library(extrafont)
+library(extrafontdb)
+loadfonts(device = "win")
+```
+
+# Topic of Interest
+
+I would like to explore the relationship between home ownership status, vacancy status, and race/ethnicity in the census level tract for Suffolk County in Massachusetts. I am using 2010 census data at the county level. 
+
+```{r load 2020 census, message=FALSE, results='hide'}
+area_vars_2010 <- load_variables(2010, "sf1")
+```
+# Load Variables 
+
+I am interested in looking at the following variables:
+
+1) Whether the tract is urban or rural (categorical)
+2) Vacancy status of a parcel (categorical) 
+3) The majority racial/ethnic identity (categorical)
+4) The percent of owner-occupied households (continuous)
+5) The percent of white owner-occupied households (continuous)
+6) The population of the tract (continuous)
+7) The median age of residents (continuous)
+
+
+
+```{r 2010 census}
+vars <- c(tot_hh = "H001001",
+          tot_urban_hh = "H002002",
+         tot_own_hh = "H016002",
+         tot_whiteown_hh = "H016A002",
+         vacancy = "H003003",
+         tot_pop = "P003001",
+         nh_white_pop = "P005003",
+         nh_black_pop = "P005004",
+         nh_asian_pop = "P005006",
+         hispanic_pop = "P005010",
+         med_age = "P013001")
+
+Suffolk_tracts <- get_decennial(geography = "tract", variables = vars,
+                           state = "MA", county = "Suffolk",
+                           output = "wide") %>%
+  mutate(urban = (tot_urban_hh == tot_hh) ,
+         pct_whiteown = tot_whiteown_hh / tot_own_hh,
+         pct_own = tot_own_hh / tot_hh, 
+         majority_race_eth = case_when(
+           nh_white_pop / tot_pop > 0.5 ~ "nh_white",
+           nh_black_pop / tot_pop > 0.5 ~ "nh_black",
+           nh_asian_pop / tot_pop > 0.5 ~ "nh_asian",
+           hispanic_pop / tot_pop > 0.5 ~ "hispanic",
+           (nh_white_pop + nh_black_pop + nh_asian_pop + hispanic_pop) /
+             tot_pop < 0.5 ~ "other",
+           TRUE ~ "None")) %>%
+  filter(tot_pop > 0, tot_hh > 0) %>%
+  select(GEOID, urban, majority_race_eth, 
+         pct_whiteown, pct_own, vacancy, tot_pop, med_age)
+
+```
+
+# Relationship Between Continuous Variables 
+
+I want to understand the relationships between my continuous variables, which are Median Age, Total Population, Percent Owner-Occupied Households, and Percent White Owner-Occupied Households. To do so, I will run a correlation test. 
+
+```{r}
+correlation1 <- cor.test(Suffolk_tracts$med_age, Suffolk_tracts$pct_own)
+correlation1
+```
+The relationship between median age and home ownership has a significant and strong positive correlation at a 95% confidence interval.  
+
+```{r}
+correlation2 <- cor.test(Suffolk_tracts$tot_pop, Suffolk_tracts$pct_own)
+correlation2
+```
+The relationship between total population and home ownership has a weak but statistically significant negative correlation at a 95% confidence interval.  
+
+```{r}
+correlation3 <- cor.test(Suffolk_tracts$tot_pop, Suffolk_tracts$med_age)
+correlation3
+```
+The relationship between total population and median age has a weak but statistically significant negative correlation at a 95% confidence interval. 
+
+```{r}
+correlation4 <- cor.test(Suffolk_tracts$med_age, Suffolk_tracts$pct_whiteown)
+correlation4
+```
+The relationship between median age and percent white home ownership has a moderate and statistically significant positive correlation at a 95% confidence interval. 
+
+
+# Graphing Strongest + Weakest Correlations
+
+
+I am interested in my strongest correlation, median age and percent home ownership, and my weakest correlation, total population and percent home ownership. I will graph both of these correlations below. 
+
+Median Age + Percent Home Ownership
+
+```{r scatterplot 1}
+ggplot(Suffolk_tracts, 
+       aes(x = med_age,
+           y = pct_own)) +
+  geom_point() +
+  scale_x_continuous(name = "Median Age",
+                     breaks = seq(0, 100, by = 5),
+                     labels = paste(seq(0, 100, by = 5), sep = "")) +
+  scale_y_continuous(name = "Percent Home Ownership",
+                     breaks = seq(0, 1, by = 0.1),
+                     labels = paste(seq(0, 100, by = 10), "%", sep = "")) +
+   theme(plot.title = element_text(family = "Garamond",
+                             size = 20),
+        axis.title = element_text(family = "Garamond"),
+        axis.text = element_text(family = "Garamond",
+                             size = 5),
+        legend.title = element_text(family = "Garamond", face = "bold"),
+        legend.text = element_text(family = "Garamond" )) +
+  annotate(geom = "text", x = 0, y = 1, 
+           label = paste("Correlation (95-percent confidence):",
+                         prettyNum(correlation1$conf.int[1], digits = 2), 
+                         "to",
+                         prettyNum(correlation1$conf.int[2], digits = 2)),
+           hjust = 0) +
+  theme_bw()
+  
+  
+```
+
+
+Total Population + Percent Home Ownership
+
+```{r scatterplot 2}
+ggplot(Suffolk_tracts, 
+       aes(x = tot_pop,
+           y = pct_own)) +
+  geom_point() +
+  scale_x_continuous(name = "Total Population",
+                     breaks = seq(0, 10000, by = 1000),
+                     labels = paste(seq(0, 10000, by = 1000), sep = "")) +
+  scale_y_continuous(name = "Percent Home Ownership",
+                     breaks = seq(0, 1, by = 0.1),
+                     labels = paste(seq(0, 100, by = 10), "%", sep = "")) +
+   theme(plot.title = element_text(family = "Garamond",
+                             size = 20),
+        axis.title = element_text(family = "Garamond"),
+        axis.text = element_text(family = "Garamond",
+                             size = 5),
+        legend.title = element_text(family = "Garamond", face = "bold"),
+        legend.text = element_text(family = "Garamond" )) +
+  annotate(geom = "text", x = 0, y = 1, 
+           label = paste("Correlation (95-percent confidence):",
+                         prettyNum(correlation2$conf.int[1], digits = 2), 
+                         "to",
+                         prettyNum(correlation2$conf.int[2], digits = 2)),
+           hjust = 0) +
+  theme_bw()
+  
+  
+```
+
+
+We can clearly see through these two scatterplots that there is a clearer linear relationship between Percent Home Ownership and Median Age, than Percent Home Ownership and Total Population.
+
+
+# Relationship Between Categorical Variables 
+I want to understand the relationship between two categorical variables, which are Majority Race/Ethnicity and Vacancy status. To do so, I will run a chi square test. 
+
+```{r}
+chi_sq <- chisq.test(Suffolk_tracts$majority_race_eth, Suffolk_tracts$vacancy)
+
+chi_sq
+```
+Because my p-value is not less than 0.05, it seems the correlation between vacancy status and majority race/ethnicity is not statistically significant.
+
+ 
+# Relationship Between Continuous + Binary Variable
+I want to understand the relationships between my continuous variables, such as median age and percent home ownership, and binary variables such as vacancy status and majority race/ethnicity. To do so, I will run a two sample t-test. 
+ 
+```{r}
+difference1 = t.test(Suffolk_tracts$majority_race_eth == "TRUE", Suffolk_tracts$med_age)
+
+difference1
+
+difference2 = t.test(Suffolk_tracts$majority_race_eth == "TRUE", Suffolk_tracts$tot_pop)
+
+difference2
+
+difference3 = t.test(Suffolk_tracts$majority_race_eth == "TRUE", Suffolk_tracts$pct_own)
+
+difference3
+
+difference4 = t.test(Suffolk_tracts$vacancy == "TRUE", Suffolk_tracts$med_age)
+
+difference4
+
+difference5 = t.test(Suffolk_tracts$vacancy == "TRUE", Suffolk_tracts$tot_pop)
+
+difference5
+
+difference6 = t.test(Suffolk_tracts$vacancy == "TRUE", Suffolk_tracts$pct_own)
+
+difference6
+```
+For all my variables, it seems that:
+
+
+Vacancy Status and Percent Home Ownership = significant, weak correlation
+
+Vacancy Status and Total Population = significant, weak correlation
+
+Vacancy Status and Median Age = significant, extremely weak correlation
+
+Majority Race Ethnicity and Median Age = significant, extremely weak correlation
+
+Majority Race Ethnicity and Total Population = significant, weak correlation
+
+Majority Race Ethnicity and Percent Home Ownership  = significant, weak correlation
+
+
+I am curious what the violin plot looks like for Majority Race Ethnicity and Percent Home Ownership:
+
+```{r}
+ggplot(Suffolk_tracts, 
+       aes(x = majority_race_eth,
+           y = pct_own,
+           color = majority_race_eth)) +
+  geom_violin() +
+  scale_x_discrete(name = "Majority Race/Ethnicity",
+                   ) +
+  scale_y_continuous(name = "Percent Home Ownership",
+                     breaks = seq(0, 1, by = 0.1),
+                     labels = paste(seq(0, 100, by = 10), "%", sep = "")) +
+   theme(plot.title = element_text(family = "Garamond",
+                             size = 20),
+        axis.title = element_text(family = "Garamond"),
+        axis.text = element_text(family = "Garamond",
+                             size = 5),
+        legend.title = element_text(family = "Garamond", face = "bold"),
+        legend.text = element_text(family = "Garamond" )) +
+  annotate(geom = "text", x = 1.7, y = 1, 
+           label = paste("Difference in means\n(95% confidence):\n",
+                         prettyNum(abs(difference3$conf.int[2]), 
+                                   digits = 2), " to ",
+                         prettyNum(abs(difference3$conf.int[1]), 
+                                   digits = 2),
+                         sep = "")) +
+  theme_bw()
+```
+
+
+# Relationship Between Three-Level Categorical Variable and Continuous Variable
+
+For looking at my three-level categorical variables and continuous variables, I will use an ANOVA test. 
+
+
+```{r}
+anova1 <- aov(vacancy ~ pct_own, data = Suffolk_tracts)
+
+summary(anova1)
+
+```
+```{r}
+anova2 <- aov(vacancy ~ med_age, data = Suffolk_tracts)
+
+summary(anova2)
+```
+
+```{r}
+anova3 <- aov(vacancy ~ tot_pop, data = Suffolk_tracts)
+
+summary(anova3)
+```
+
+Findings:
+
+
+Vacancy/Percent Ownership: Not Significant
+
+Vacancy/Median Age: Not Significant 
+
+Vacancy/Total Population: Significant
+
+
+
+
+
+
+

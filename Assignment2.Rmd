@@ -1,0 +1,344 @@
+---
+title: "Assignment 2"
+author: "Kari Roynesdal"
+date: "9/13/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+```{r load libraries, message=FALSE, results='hide'}
+library(tidycensus)
+library(tidyverse)
+library(ggplot2)
+library(extrafont)
+library(extrafontdb)
+loadfonts(device = "win")
+```
+```{r load household data, message=FALSE, results='hide'}
+hh_vars_2018 <- pums_variables %>%
+  distinct(year, survey, var_code, 
+           var_label, data_type, level) %>%
+  filter(level == "housing", year == 2018, survey == "acs1")
+```
+```{r load acs1, message=FALSE, results='hide'}
+area_vars_2018 <- load_variables(2018, "acs1")
+```
+```{r load 2020 census, message=FALSE, results='hide'}
+area_vars_2010 <- load_variables(2010, "sf1")
+```
+# Load Variables 
+
+I am interested in looking at the following variables:
+
+1) Whether the tract is urban or rural (categorical)
+2) The percent of white owner-occupied households (continuous)
+3) The majority racial/ethnic identity (categorical)
+4) The percent of female residents (continuous)
+4) The population of the tract (continuous)
+5) The median age of residents (continuous)
+
+I am using 2010 census data for county level census tracts in Suffolk county in Massachusetts.
+
+```{r 2010 census}
+vars <- c(tot_hh = "H001001",
+          tot_urban_hh = "H002002",
+         tot_own_hh = "H016002",
+         tot_whiteown_hh = "H016A002",
+         tot_sex = "P012001",
+         tot_female = "P012026",
+         tot_pop = "P003001",
+         nh_white_pop = "P005003",
+         nh_black_pop = "P005004",
+         nh_asian_pop = "P005006",
+         hispanic_pop = "P005010",
+         med_age = "P013001")
+
+Suffolk_tracts <- get_decennial(geography = "tract", variables = vars,
+                           state = "MA", county = "Suffolk",
+                           output = "wide") %>%
+  mutate(urban = (tot_urban_hh == tot_hh) ,
+         pct_whiteown = tot_whiteown_hh / tot_own_hh,
+         pct_own = tot_own_hh / tot_hh, 
+         pct_female = tot_female / tot_sex,
+         majority_race_eth = case_when(
+           nh_white_pop / tot_pop > 0.5 ~ "nh_white",
+           nh_black_pop / tot_pop > 0.5 ~ "nh_black",
+           nh_asian_pop / tot_pop > 0.5 ~ "nh_asian",
+           hispanic_pop / tot_pop > 0.5 ~ "hispanic",
+           (nh_white_pop + nh_black_pop + nh_asian_pop + hispanic_pop) /
+             tot_pop < 0.5 ~ "other",
+           TRUE ~ "None")) %>%
+  filter(tot_pop > 0, tot_hh > 0) %>%
+  select(GEOID, urban, majority_race_eth, 
+         pct_whiteown, pct_own, pct_female, tot_pop, med_age)
+
+```
+
+# Scatterplot
+```{r scatterplot 1}
+ggplot(Suffolk_tracts, 
+       aes(x = pct_own,
+           y = med_age,
+           color = majority_race_eth)) +
+  geom_point() +
+  scale_x_continuous(name = "Percent of Households Who Own Their Homes",
+                     breaks = seq(0, 1, by = 0.1),
+                     labels = paste(seq(0, 100, by = 10), "%", sep = "")) +
+  scale_y_continuous(name = "Median age within tract",
+                     breaks = seq(10, 80, by = 10)) +
+  scale_color_discrete(name = "Majority race/ethnicity",
+                       labels = c("Hispanic",
+                                  "Non-Hispanic Asian",
+                                  "Non-Hispanic white",
+                                  "No majority")) +
+    theme(plot.title = element_text(family = "Garamond",
+                             size = 20),
+        axis.title = element_text(family = "Garamond"),
+        axis.text = element_text(family = "Arial",
+                             size = 5),
+        legend.title = element_text(family = "Garamond", face = "bold"),
+        legend.text = element_text(family = "Garamond" )) +
+  theme_bw() 
+  
+```
+```{r}
+ggplot(Suffolk_tracts, 
+       aes(x = med_age,
+           y = tot_pop)) +
+  geom_point() +
+  stat_smooth(color = "black", linetype = 2, size = 0.5) +
+  scale_x_continuous(name = "Median Age for Tract Population") +
+  scale_y_continuous(name = "Tract population",
+                     trans = "log") +
+  theme(plot.title = element_text(family = "Garamond",
+                             size = 20),
+        axis.title = element_text(family = "Garamond"),
+        axis.text = element_text(family = "Arial",
+                             size = 8),
+        legend.title = element_text(family = "Garamond", face = "bold"),
+        legend.text = element_text(family = "Garamond" )) + 
+  theme_bw()
+```
+```{r, results='hide', message=FALSE}
+ggplot(Suffolk_tracts, 
+       aes(x = pct_whiteown,
+           y = med_age)) +
+  geom_point() +
+  stat_smooth(color = "black", linetype = 2, size = 0.5) +
+  scale_x_continuous(name = "Percent of White Owner-Occupied Households") +
+  scale_y_continuous(name = "Median Age") +
+  theme(plot.title = element_text(family = "Garamond",
+                             size = 20),
+        axis.title = element_text(family = "Garamond"),
+        axis.text = element_text(family = "Arial",
+                             size = 6),
+        legend.title = element_text(family = "Garamond", face = "bold"),
+        legend.text = element_text(family = "Garamond" )) +
+theme_bw()
+```
+# Box Plot
+
+```{r box plot, results='hide', message=FALSE}
+ggplot(Suffolk_tracts, 
+       aes(x = majority_race_eth,
+           y = pct_own,
+           color = majority_race_eth)) +
+  geom_boxplot() +
+  scale_x_discrete(name = "Majority race/ethnicity",
+                       labels = c("Hispanic",
+                                  "Non-Hispanic Asian",
+                                  "Non-Hispanic white",
+                                  "No majority")) +
+  scale_y_continuous(name = "Percent of Owner-Occupied Households",
+                     breaks = seq(10, 80, by = 10)) +
+  theme(plot.title = element_text(family = "Garamond",
+                             size = 20),
+        axis.title = element_text(family = "Garamond"),
+        axis.text = element_text(family = "Arial",
+                             size = 6),) +
+  theme_bw() +
+  theme(legend.position = "hide")
+```
+# Categorical Variables 
+```{r categorical variables, results='hide', message=FALSE}
+ggplot(Suffolk_tracts, aes(x = majority_race_eth, fill = urban)) +
+  geom_bar(position = "dodge") +
+  scale_y_continuous(name = "Number of tracts") +
+  scale_x_discrete(name = "Majority race/ethnicity",
+                       labels = c("Hispanic",
+                                  "Non-Hispanic\nAsian",
+                                  "Non-Hispanic\nwhite",
+                                  "No majority")) +
+  scale_fill_discrete(name = element_blank(),
+                        labels = c("Urban tracts",
+                                   "Rural tracts")) +
+  theme(plot.title = element_text(family = "Garamond",
+                             size = 20),
+        axis.title = element_text(family = "Garamond"),
+        axis.text = element_text(family = "Arial",
+                             size = 6),
+        legend.title = element_text(family = "Garamond", face = "bold"),
+        legend.text = element_text(family = "Garamond" )) +
+  theme_bw() 
+
+```
+
+
+# Analyze Distributions of Continuous Variables
+
+Percent of White Owner-Occupied Households
+```{r}
+pct_whiteown_summary <- summary(Suffolk_tracts$pct_whiteown)
+```
+```{r}
+pct_whiteown_summary
+```
+
+Standard Deviation
+```{r,}
+sd(Suffolk_tracts$pct_whiteown, na.rm = TRUE)
+```
+95% Confidence Interval
+```{r}
+conf_int <- t.test(Suffolk_tracts$pct_whiteown)
+```
+```{r}
+conf_int
+```
+
+Histogram
+```{r}
+ggplot(Suffolk_tracts, aes(x = pct_whiteown)) +
+  theme(plot.title = element_text(family = "Garamond",
+                             size = 20), 
+        axis.title = element_text(family = "Garamond"),
+        axis.text = element_text(family = "Arial",
+                             size = 6),
+        legend.title = element_text(family = "Garamond", face = "bold"),
+        legend.text = element_text(family = "Garamond" )) +
+  geom_histogram()
+
+
+```
+
+This distribution shows the data for white owner-occupied households as strongly skewed to the right, showing that for all owner-occupied households in Suffolk County, a significant majority of those households are white, with a mean of nearly 66% and an interquartile range between 56% and 89%. 
+
+Percent of Owner-Occupied Households
+```{r}
+pct_own_summary <- summary(Suffolk_tracts$pct_own)
+```
+```{r}
+pct_own_summary
+```
+
+Standard Deviation
+```{r}
+sd(Suffolk_tracts$pct_own)
+```
+95% Confidence Interval
+```{r}
+conf_int <- t.test(Suffolk_tracts$pct_own)
+```
+```{r}
+conf_int
+```
+Histogram
+```{r}
+ggplot(Suffolk_tracts, aes(x = pct_own)) +
+  theme(plot.title = element_text(family = "Garamond",
+                             size = 20), 
+        axis.title = element_text(family = "Garamond"),
+        axis.text = element_text(family = "Arial",
+                             size = 6),
+        legend.title = element_text(family = "Garamond", face = "bold"),
+        legend.text = element_text(family = "Garamond" )) +
+  geom_histogram()
+```
+
+This distribution shows the data for owner-occupied households to be quite different from the previous graph, and skewed to the left. The average of all households that are owner-occupied is around 32% with an interquartile range between 19% and 43%. 
+
+Total Population
+```{r}
+tot_pop_summary <- summary(Suffolk_tracts$tot_pop)
+```
+```{r}
+tot_pop_summary
+```
+
+Standard Deviation
+```{r}
+sd(Suffolk_tracts$tot_pop)
+```
+95% Confidence Interval
+```{r}
+conf_int <- t.test(Suffolk_tracts$tot_pop)
+```
+```{r}
+conf_int
+```
+Histogram
+```{r}
+ggplot(Suffolk_tracts, aes(x = tot_pop)) +
+  theme(plot.title = element_text(family = "Garamond",
+                             size = 20), 
+        axis.title = element_text(family = "Garamond"),
+        axis.text = element_text(family = "Arial",
+                             size = 6),
+        legend.title = element_text(family = "Garamond", face = "bold"),
+        legend.text = element_text(family = "Garamond" )) +
+  geom_histogram()
+```
+
+This graph shows the total distribution of the total population of Suffolk County, where the average population size per census tract is 3661, with the interquartile range of the population between 2478 and 4766. 
+
+Median Age
+```{r}
+med_age_summary <- summary(Suffolk_tracts$med_age)
+```
+```{r}
+med_age_summary
+```
+
+Standard Deviation
+```{r}
+sd(Suffolk_tracts$med_age)
+```
+95% Confidence Interval
+```{r}
+conf_int <- t.test(Suffolk_tracts$med_age)
+```
+```{r}
+conf_int
+```
+Histogram
+```{r}
+ggplot(Suffolk_tracts, aes(x = med_age)) +
+  theme(plot.title = element_text(family = "Garamond",
+                             size = 20), 
+        axis.title = element_text(family = "Garamond"),
+        axis.text = element_text(family = "Arial",
+                             size = 6),
+        legend.title = element_text(family = "Garamond", face = "bold"),
+        legend.text = element_text(family = "Garamond" )) +
+  geom_histogram()
+```
+
+This graph shows the median age in Suffolk County, where the average age and median age are fairly similar at age 33, and the interquartile range between 29.5 and 36.9. 
+
+# Categorical Variable Proportions
+
+```{r}
+unique(Suffolk_tracts$majority_race_eth)
+
+```
+```{r}
+unique(Suffolk_tracts)
+```
+```{r}
+write_csv(Suffolk_tracts, "Suffolk_tracts.csv")
+```
+
+
+
